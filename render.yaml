@@ -5,6 +5,21 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt && python -m playwright install chromium
     startCommand: python telegram_bot.py
+    healthCheckPath: /healthz
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
+
+# ⚠️  CÁCH KHẮC PHỤC BOT BỊ SLEEP:
+# 1. FREE PLAN (hiện tại):
+#    - Service sẽ sleep sau 15 phút inactive
+#    - Đã thêm keep-alive task (ping mỗi 5 phút)
+#    - Nếu vẫn bị sleep: Xem note #2
+#
+# 2. UPGRADE PLAN (khuyến nghị):
+#    - Đổi plan từ free → starter/pro để service chạy liên tục
+#    - Hoặc: Dùng service bên ngoài để ping định kỳ
+#
+# 3. EXTERNAL KEEP-ALIVE (tuỳ chọn):
+#    - Dùng UptimeRobot (miễn phí) để ping https://your-render-url/healthz mỗi 5 phút
+#    - Link: https://uptimerobot.com
