@@ -1,0 +1,19 @@
+[Unit]
+Description=DNS Service
+After=network.target
+
+[Service]
+Type=simple
+# Replace 'ubuntu' with the system user that should run the service
+User=ubuntu
+WorkingDirectory=/home/ubuntu/dns
+# Ensure the virtualenv bin is on PATH
+Environment=PATH=/home/ubuntu/dns/.venv/bin
+ExecStart=/home/ubuntu/dns/.venv/bin/python /home/ubuntu/dns/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/dns/out.log
+StandardError=append:/var/log/dns/err.log
+
+[Install]
+WantedBy=multi-user.target
