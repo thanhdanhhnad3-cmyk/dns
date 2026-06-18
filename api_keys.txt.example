@@ -1,0 +1,3 @@
+# Example secrets file. Do NOT store real secrets here.
+NEXTDNS_API_KEY=your_api_key_here
+OTHER_SECRET=example_value
