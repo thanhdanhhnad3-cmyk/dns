@@ -1,4 +1,6 @@
-[Unit]
+cat ~/.ssh/id_ed25519.pub
+# hoặc
+cat ~/.ssh/id_rsa.pub[Unit]
 Description=DNS Service
 After=network.target
 

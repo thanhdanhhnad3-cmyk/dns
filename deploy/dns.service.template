@@ -1,0 +1,19 @@
+[Unit]
+Description=NextDNS Auto-Register Service (template)
+After=network.target
+
+[Service]
+Type=simple
+# Replace root with the system user that should run the service
+User=root
+WorkingDirectory=/opt/dns
+# Ensure the virtualenv bin is on PATH
+Environment=PATH=/opt/dns/venv/bin
+ExecStart=/opt/dns/venv/bin/python /opt/dns/main.py --count 1
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/dns/out.log
+StandardError=append:/var/log/dns/err.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,10 @@
-# NextDNS Auto-Register Tool
+cd /path/to/dns
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+python -m playwright install chromium
+python telegram_bot.py# NextDNS Auto-Register Tool
 
 Tự động đăng ký tài khoản NextDNS và lấy API key bằng email tạm từ tinyhost.shop + Playwright.
 
