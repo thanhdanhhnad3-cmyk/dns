@@ -8,6 +8,7 @@ import threading
 from datetime import datetime
 import requests
 from telegram import Update
+from telegram.error import Conflict
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import MessageHandler, filters, CallbackQueryHandler
@@ -81,27 +82,39 @@ async def generate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         # Register account
         result = await register_single(tinyhost_client, visible=False)
-        
-        if result and result.success and result.api_key:
-            profile_link = (
-                f"https://apple.nextdns.io/?profile={result.profile_id}"
-                if result.profile_id else "N/A"
+
+        if not result:
+            await msg.edit_text("❌ Tạo thất bại: lỗi nội bộ không xác định. Vui lòng thử lại sau.")
+            return
+
+        if not result.success:
+            error_text = result.error or "unknown_error"
+            await msg.edit_text(f"❌ Tạo thất bại: {error_text}")
+            return
+
+        if result.api_key == "NOT_FOUND":
+            await msg.edit_text(
+                "❌ Tạo thất bại: đã đăng ký thành công nhưng không tìm thấy API key. "
+                "Vui lòng thử lại sau hoặc kiểm tra log."
             )
-            password_text = f"🔒 Mật khẩu: `{result.password}`\n" if result.password else ""
-            # Format response
-            response = (
-                f"✅ *Tạo Thành Công!*\n\n"
-                f"📧 Email: `{result.email}`\n"
-                f"{password_text}"
-                f"🔑 API Key: `{result.api_key}`\n"
-                f"📱 Profile ID: `{result.profile_id}`\n"
-                f"🔗 Link: {profile_link}\n"
-                f"⏰ Tạo lúc: {result.created_at}"
-            )
-            await msg.edit_text(response, parse_mode="Markdown")
-        else:
-            await msg.edit_text("❌ Tạo thất bại. Vui lòng thử lại!")
-            
+            return
+
+        profile_link = (
+            f"https://apple.nextdns.io/?profile={result.profile_id}"
+            if result.profile_id else "N/A"
+        )
+        password_text = f"🔒 Mật khẩu: `{result.password}`\n" if result.password else ""
+        # Format response
+        response = (
+            f"✅ *Tạo Thành Công!*\n\n"
+            f"📧 Email: `{result.email}`\n"
+            f"{password_text}"
+            f"🔑 API Key: `{result.api_key}`\n"
+            f"📱 Profile ID: `{result.profile_id}`\n"
+            f"🔗 Link: {profile_link}\n"
+            f"⏰ Tạo lúc: {result.created_at}"
+        )
+        await msg.edit_text(response, parse_mode="Markdown")
     except Exception as e:
         await msg.edit_text(f"❌ Lỗi: {str(e)}")
 
@@ -222,22 +235,32 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def run_health_server(port: int = 8080):
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    server.serve_forever()
+    try:
+        server = HTTPServer(("0.0.0.0", port), HealthHandler)
+        print(f"🌐 Health server listening on port {port}")
+        server.serve_forever()
+    except OSError as e:
+        if e.errno == 98:
+            print(f"⚠️ Health server port {port} is already in use; health endpoint disabled.")
+            return
+        raise
+    except Exception as e:
+        print(f"⚠️ Health server error: {e}")
 
 
-def keep_alive_loop_blocking():
+def keep_alive_loop_blocking(port: int = 8080):
     """
     Blocking keep-alive loop for thread-safe operation.
     Pings the health endpoint every 5 minutes using requests and time.sleep.
     This avoids creating a separate asyncio event loop in a thread.
     """
     import time
+    url = f"http://127.0.0.1:{port}/healthz"
     while True:
         try:
             time.sleep(300)  # 5 minutes
             try:
-                response = requests.get("http://localhost:8080/healthz", timeout=5)
+                response = requests.get(url, timeout=5)
                 if response.status_code == 200:
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     print(f"[{timestamp}] 🔄 Keep-alive ping OK")
@@ -282,17 +305,24 @@ def main() -> None:
 
     # Start keep-alive thread (blocking loop, no asyncio event loop created)
     keep_alive_thread = threading.Thread(
-        target=keep_alive_loop_blocking,
+        target=lambda: keep_alive_loop_blocking(port_env),
         daemon=True,
     )
     keep_alive_thread.start()
 
     print("🤖 Bot đang chạy...")
     print(f"Token: {TELEGRAM_BOT_TOKEN[:10]}...")
-    print("🌐 Health check: http://0.0.0.0:8080/healthz")
+    print(f"🌐 Health check: http://0.0.0.0:{port_env}/healthz")
     print("💪 Keep-alive: Bật (ping mỗi 5 phút)")
 
-    application.run_polling()
+    try:
+        application.run_polling()
+    except Conflict as e:
+        print("❌ Telegram bot conflict detected: another getUpdates session is active.")
+        print("   Make sure only one instance of this bot is running and retry.")
+        print(f"   Details: {e}")
+    except Exception as e:
+        print(f"❌ Telegram bot failed: {e}")
 
 
 if __name__ == "__main__":
